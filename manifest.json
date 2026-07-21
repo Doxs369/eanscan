@@ -4,8 +4,8 @@
   "description": "La tua dispensa intelligente con scansione barcode e tracking scadenze",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f0f1a",
-  "theme_color": "#1a1a2e",
+  "background_color": "#0d1f1a",
+  "theme_color": "#1a3d35",
   "orientation": "portrait",
   "icons": [
     {

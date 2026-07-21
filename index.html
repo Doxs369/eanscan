@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#1a1a2e">
+    <meta name="theme-color" content="#1a3d35">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>ScanEan - Gestione Dispensa</title>
@@ -13,29 +13,41 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --bg-primary: #0f0f1a;
-            --bg-secondary: #1a1a2e;
-            --bg-card: #16213e;
-            --bg-card-hover: #1e2a4a;
-            --accent: #e94560;
-            --accent-light: #ff6b81;
-            --accent-glow: rgba(233, 69, 96, 0.3);
+            /* Palette dal logo */
+            --teal: #2daf91;
+            --teal-dark: #1e8a70;
+            --teal-darker: #145c4a;
+            --teal-light: #4dd4b3;
+            --teal-lighter: #e6fffa;
+            --coral: #ff7d55;
+            --coral-dark: #e85a30;
+            --coral-light: #ffa88a;
+            --coral-glow: rgba(255, 125, 85, 0.35);
+            --teal-glow: rgba(45, 175, 145, 0.35);
+
+            /* UI Colors */
+            --bg-primary: #0d1f1a;
+            --bg-secondary: #142e26;
+            --bg-card: #1a3d35;
+            --bg-card-hover: #234d42;
+            --bg-elevated: #1f4a3e;
             --text-primary: #ffffff;
-            --text-secondary: #a0a0b8;
-            --text-muted: #6b6b8a;
-            --border: rgba(255,255,255,0.08);
-            --green: #00d4aa;
-            --green-glow: rgba(0, 212, 170, 0.3);
+            --text-secondary: #a8d4c8;
+            --text-muted: #5a9a88;
+            --border: rgba(45, 175, 145, 0.12);
+            --border-strong: rgba(45, 175, 145, 0.25);
+
+            /* Status */
+            --green: #2daf91;
+            --green-glow: rgba(45, 175, 145, 0.3);
             --yellow: #f0c040;
             --yellow-glow: rgba(240, 192, 64, 0.3);
-            --red: #e94560;
-            --red-glow: rgba(233, 69, 96, 0.3);
-            --blue: #4facfe;
-            --purple: #a855f7;
-            --orange: #f97316;
-            --glass: rgba(255,255,255,0.05);
-            --glass-border: rgba(255,255,255,0.1);
-            --shadow: 0 8px 32px rgba(0,0,0,0.4);
+            --red: #ff6b6b;
+            --red-glow: rgba(255, 107, 107, 0.3);
+
+            --glass: rgba(45, 175, 145, 0.06);
+            --glass-border: rgba(45, 175, 145, 0.15);
+            --shadow: 0 8px 32px rgba(0,0,0,0.5);
             --radius: 16px;
             --radius-sm: 12px;
             --radius-lg: 24px;
@@ -52,12 +64,10 @@
             line-height: 1.5;
         }
 
-        /* Scrollbar */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--teal); border-radius: 4px; }
 
-        /* Animations */
         @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
@@ -76,6 +86,14 @@
             100% { background-position: 200% 0; }
         }
         @keyframes countUp { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+        @keyframes glowPulse {
+            0%, 100% { box-shadow: 0 0 20px var(--teal-glow); }
+            50% { box-shadow: 0 0 40px var(--teal-glow), 0 0 60px rgba(45,175,145,0.1); }
+        }
+        @keyframes borderGlow {
+            0%, 100% { border-color: rgba(45,175,145,0.3); }
+            50% { border-color: var(--teal); }
+        }
 
         .animate-in { animation: fadeIn 0.4s ease-out forwards; }
         .animate-up { animation: slideUp 0.5s ease-out forwards; }
@@ -83,15 +101,17 @@
         /* Header */
         .app-header {
             position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-            background: rgba(15,15,26,0.85);
+            background: rgba(13,31,26,0.9);
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
             padding: 12px 20px;
             display: flex; align-items: center; justify-content: space-between;
         }
+        .logo-container { display: flex; align-items: center; gap: 10px; }
+        .logo-container img { height: 32px; width: auto; }
         .app-header h1 {
-            font-size: 22px; font-weight: 800;
-            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            font-size: 20px; font-weight: 800;
+            background: linear-gradient(135deg, var(--teal), var(--teal-light));
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             background-clip: text;
         }
@@ -102,7 +122,7 @@
             color: var(--text-primary); display: flex; align-items: center; justify-content: center;
             cursor: pointer; transition: all 0.2s; font-size: 16px;
         }
-        .header-btn:hover { background: var(--accent); border-color: var(--accent); transform: scale(1.1); }
+        .header-btn:hover { background: var(--teal); border-color: var(--teal); transform: scale(1.1); }
         .header-btn:active { transform: scale(0.95); }
 
         /* Main Content */
@@ -110,8 +130,8 @@
 
         /* Sponsor Banner */
         .sponsor-banner {
-            background: linear-gradient(135deg, rgba(168,85,247,0.15), rgba(79,172,254,0.15));
-            border: 1px solid rgba(168,85,247,0.3);
+            background: linear-gradient(135deg, rgba(255,125,85,0.12), rgba(45,175,145,0.08));
+            border: 1px solid rgba(255,125,85,0.25);
             border-radius: var(--radius-sm);
             padding: 10px 16px;
             font-size: 12px;
@@ -120,11 +140,11 @@
             margin-bottom: 16px;
             animation: fadeIn 0.5s ease-out;
         }
-        .sponsor-banner strong { color: var(--purple); }
+        .sponsor-banner strong { color: var(--coral); }
         .sponsor-banner code {
-            background: rgba(168,85,247,0.2);
+            background: rgba(255,125,85,0.15);
             padding: 2px 8px; border-radius: 4px;
-            color: var(--purple); font-weight: 600;
+            color: var(--coral); font-weight: 600;
         }
 
         /* Stats Grid */
@@ -141,10 +161,10 @@
             position: relative; overflow: hidden;
             transition: all 0.3s ease;
         }
-        .stat-card:hover { transform: translateY(-4px); border-color: var(--accent); }
+        .stat-card:hover { transform: translateY(-4px); border-color: var(--teal); }
         .stat-card::before {
             content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-            background: var(--accent); opacity: 0.6;
+            background: var(--teal); opacity: 0.6;
         }
         .stat-card:nth-child(2)::before { background: var(--yellow); }
         .stat-card:nth-child(3)::before { background: var(--red); }
@@ -162,17 +182,17 @@
 
         /* Waste Index Card */
         .waste-index-card {
-            background: linear-gradient(135deg, rgba(0,212,170,0.1), rgba(79,172,254,0.1));
-            border: 1px solid rgba(0,212,170,0.2);
+            background: linear-gradient(135deg, rgba(45,175,145,0.1), rgba(45,175,145,0.05));
+            border: 1px solid rgba(45,175,145,0.2);
             border-radius: var(--radius-sm);
             padding: 16px;
             margin-bottom: 20px;
             display: flex; align-items: center; justify-content: space-between;
         }
-        .waste-index-info h3 { font-size: 14px; font-weight: 600; color: var(--green); }
+        .waste-index-info h3 { font-size: 14px; font-weight: 600; color: var(--teal); }
         .waste-index-info p { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
         .waste-index-value {
-            font-size: 28px; font-weight: 800; color: var(--green);
+            font-size: 28px; font-weight: 800; color: var(--teal);
         }
 
         /* Categories */
@@ -194,10 +214,10 @@
             cursor: pointer; transition: all 0.2s; white-space: nowrap;
             display: flex; align-items: center; gap: 6px;
         }
-        .category-chip:hover { background: var(--bg-card-hover); border-color: var(--accent); color: var(--text-primary); }
+        .category-chip:hover { background: var(--bg-card-hover); border-color: var(--teal); color: var(--text-primary); }
         .category-chip.active {
-            background: var(--accent); border-color: var(--accent);
-            color: white; box-shadow: 0 4px 16px var(--accent-glow);
+            background: var(--teal); border-color: var(--teal);
+            color: white; box-shadow: 0 4px 16px var(--teal-glow);
         }
 
         /* Products List */
@@ -209,7 +229,7 @@
             cursor: pointer; transition: all 0.2s ease;
             position: relative; overflow: hidden;
         }
-        .product-card:hover { border-color: var(--accent); transform: translateX(4px); }
+        .product-card:hover { border-color: var(--teal); transform: translateX(4px); }
         .product-card::after {
             content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
             background: var(--green); border-radius: 3px 0 0 3px;
@@ -229,9 +249,9 @@
             font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 50px;
             display: flex; align-items: center; gap: 4px;
         }
-        .expiry-badge.green { background: rgba(0,212,170,0.15); color: var(--green); }
+        .expiry-badge.green { background: rgba(45,175,145,0.15); color: var(--green); }
         .expiry-badge.yellow { background: rgba(240,192,64,0.15); color: var(--yellow); }
-        .expiry-badge.red { background: rgba(233,69,96,0.15); color: var(--red); }
+        .expiry-badge.red { background: rgba(255,107,107,0.15); color: var(--red); }
         .product-qty {
             width: 32px; height: 32px; border-radius: 50%;
             background: var(--glass); border: 1px solid var(--glass-border);
@@ -253,12 +273,12 @@
         /* Recipes Section */
         .recipes-section { margin-bottom: 20px; }
         .recipe-card {
-            background: linear-gradient(135deg, var(--bg-card), rgba(233,69,96,0.05));
+            background: linear-gradient(135deg, var(--bg-card), rgba(45,175,145,0.05));
             border: 1px solid var(--border); border-radius: var(--radius-sm);
             padding: 16px; margin-bottom: 10px;
             cursor: pointer; transition: all 0.2s;
         }
-        .recipe-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .recipe-card:hover { border-color: var(--teal); transform: translateY(-2px); }
         .recipe-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
         .recipe-emoji { font-size: 28px; }
         .recipe-name { font-weight: 700; font-size: 16px; }
@@ -266,24 +286,25 @@
         .recipe-badge {
             display: inline-flex; align-items: center; gap: 4px;
             font-size: 11px; font-weight: 600; color: var(--green);
-            background: rgba(0,212,170,0.1); padding: 4px 10px; border-radius: 50px;
+            background: rgba(45,175,145,0.1); padding: 4px 10px; border-radius: 50px;
         }
 
         /* Scanner Section */
         .scanner-section {
-            background: linear-gradient(135deg, var(--bg-card), rgba(233,69,96,0.08));
-            border: 2px dashed var(--accent); border-radius: var(--radius-lg);
+            background: linear-gradient(135deg, var(--bg-card), rgba(45,175,145,0.08));
+            border: 2px dashed var(--teal); border-radius: var(--radius-lg);
             padding: 40px 24px; text-align: center;
             margin-bottom: 20px; position: relative; overflow: hidden;
             cursor: pointer; transition: all 0.3s;
+            animation: borderGlow 3s ease-in-out infinite;
         }
-        .scanner-section:hover { border-color: var(--accent-light); background: rgba(233,69,96,0.05); }
+        .scanner-section:hover { border-color: var(--teal-light); background: rgba(45,175,145,0.08); }
         .scanner-icon {
             width: 80px; height: 80px; border-radius: 50%;
-            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            background: linear-gradient(135deg, var(--teal), var(--teal-light));
             display: flex; align-items: center; justify-content: center;
             margin: 0 auto 16px; font-size: 32px;
-            box-shadow: 0 8px 32px var(--accent-glow);
+            box-shadow: 0 8px 32px var(--teal-glow);
             animation: pulse 2s infinite;
         }
         .scanner-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
@@ -297,16 +318,16 @@
         }
         .smart-badge {
             display: inline-flex; align-items: center; gap: 6px;
-            background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(79,172,254,0.2));
-            border: 1px solid rgba(168,85,247,0.3); border-radius: 50px;
-            padding: 4px 12px; font-size: 12px; font-weight: 600; color: var(--purple);
+            background: linear-gradient(135deg, rgba(255,125,85,0.15), rgba(45,175,145,0.1));
+            border: 1px solid rgba(255,125,85,0.25); border-radius: 50px;
+            padding: 4px 12px; font-size: 12px; font-weight: 600; color: var(--coral);
         }
         .progress-bar {
             height: 6px; background: var(--glass); border-radius: 3px;
             margin-bottom: 16px; overflow: hidden;
         }
         .progress-fill {
-            height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-light));
+            height: 100%; background: linear-gradient(90deg, var(--teal), var(--teal-light));
             border-radius: 3px; transition: width 0.5s ease;
         }
         .shopping-item {
@@ -315,7 +336,7 @@
             border: 1px solid var(--border); border-radius: var(--radius-sm);
             margin-bottom: 8px; transition: all 0.2s;
         }
-        .shopping-item:hover { border-color: var(--accent); }
+        .shopping-item:hover { border-color: var(--teal); }
         .shopping-item.completed { opacity: 0.5; }
         .shopping-item.completed .shopping-text { text-decoration: line-through; }
         .shopping-checkbox {
@@ -325,17 +346,17 @@
             transition: all 0.2s; flex-shrink: 0;
         }
         .shopping-checkbox.checked {
-            background: var(--green); border-color: var(--green);
-            box-shadow: 0 0 12px var(--green-glow);
+            background: var(--teal); border-color: var(--teal);
+            box-shadow: 0 0 12px var(--teal-glow);
         }
         .shopping-text { flex: 1; font-size: 14px; }
         .shopping-reason { font-size: 11px; color: var(--text-muted); }
-        .shopping-reason.smart { color: var(--purple); }
+        .shopping-reason.smart { color: var(--coral); }
 
         /* Bottom Nav */
         .bottom-nav {
             position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
-            background: rgba(15,15,26,0.9);
+            background: rgba(13,31,26,0.95);
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             border-top: 1px solid var(--border);
             display: flex; justify-content: space-around;
@@ -348,7 +369,7 @@
             transition: all 0.2s; border: none; background: none;
         }
         .nav-item i { font-size: 20px; transition: all 0.2s; }
-        .nav-item.active { color: var(--accent); }
+        .nav-item.active { color: var(--teal); }
         .nav-item.active i { transform: translateY(-2px); }
         .nav-item:hover { color: var(--text-primary); }
 
@@ -356,10 +377,10 @@
         .scan-fab {
             position: fixed; bottom: 80px; right: 20px; z-index: 99;
             width: 60px; height: 60px; border-radius: 50%;
-            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            background: linear-gradient(135deg, var(--teal), var(--teal-light));
             border: none; color: white; font-size: 24px;
             display: flex; align-items: center; justify-content: center;
-            cursor: pointer; box-shadow: 0 8px 32px var(--accent-glow);
+            cursor: pointer; box-shadow: 0 8px 32px var(--teal-glow);
             transition: all 0.3s; animation: float 3s ease-in-out infinite;
         }
         .scan-fab:hover { transform: scale(1.1); }
@@ -368,7 +389,7 @@
         /* Modal */
         .modal-overlay {
             position: fixed; inset: 0; z-index: 200;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.8);
             backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
             display: flex; align-items: flex-end; justify-content: center;
             opacity: 0; pointer-events: none; transition: opacity 0.3s;
@@ -400,7 +421,7 @@
             display: block; font-size: 13px; font-weight: 600;
             color: var(--text-secondary); margin-bottom: 6px;
         }
-        .form-label .required { color: var(--accent); }
+        .form-label .required { color: var(--coral); }
         .form-input, .form-select, .form-textarea {
             width: 100%; padding: 12px 16px;
             background: var(--bg-card); border: 1px solid var(--border);
@@ -409,8 +430,8 @@
             transition: all 0.2s;
         }
         .form-input:focus, .form-select:focus, .form-textarea:focus {
-            outline: none; border-color: var(--accent);
-            box-shadow: 0 0 0 3px var(--accent-glow);
+            outline: none; border-color: var(--teal);
+            box-shadow: 0 0 0 3px var(--teal-glow);
         }
         .form-textarea { min-height: 80px; resize: vertical; }
         .photo-upload {
@@ -419,7 +440,7 @@
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             cursor: pointer; transition: all 0.2s; gap: 8px;
         }
-        .photo-upload:hover { border-color: var(--accent); background: rgba(233,69,96,0.05); }
+        .photo-upload:hover { border-color: var(--teal); background: rgba(45,175,145,0.05); }
         .photo-upload i { font-size: 32px; color: var(--text-muted); }
         .photo-upload span { font-size: 13px; color: var(--text-muted); }
         .photo-preview {
@@ -428,13 +449,13 @@
         }
         .btn-primary {
             width: 100%; padding: 14px;
-            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            background: linear-gradient(135deg, var(--teal), var(--teal-light));
             border: none; border-radius: var(--radius-sm);
             color: white; font-size: 16px; font-weight: 700;
             cursor: pointer; transition: all 0.2s;
             display: flex; align-items: center; justify-content: center; gap: 8px;
         }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px var(--accent-glow); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px var(--teal-glow); }
         .btn-primary:active { transform: translateY(0); }
         .btn-secondary {
             width: 100%; padding: 14px;
@@ -444,6 +465,15 @@
             transition: all 0.2s; margin-top: 10px;
         }
         .btn-secondary:hover { background: var(--bg-card-hover); }
+        .btn-coral {
+            width: 100%; padding: 14px;
+            background: linear-gradient(135deg, var(--coral), var(--coral-light));
+            border: none; border-radius: var(--radius-sm);
+            color: white; font-size: 16px; font-weight: 700;
+            cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-coral:hover { transform: translateY(-2px); box-shadow: 0 8px 24px var(--coral-glow); }
 
         /* Scanner Modal */
         .scanner-view {
@@ -453,23 +483,32 @@
         .scanner-view video { width: 100%; height: 100%; object-fit: cover; }
         .scanner-frame {
             position: absolute; inset: 20%;
-            border: 2px solid var(--accent); border-radius: 8px;
+            border: 2px solid var(--teal); border-radius: 8px;
+            box-shadow: 0 0 20px var(--teal-glow);
         }
         .scanner-frame::before, .scanner-frame::after {
             content: ''; position: absolute; width: 20px; height: 20px;
-            border-color: var(--accent); border-style: solid;
+            border-color: var(--teal); border-style: solid;
         }
         .scanner-frame::before { top: -2px; left: -2px; border-width: 4px 0 0 4px; }
         .scanner-frame::after { bottom: -2px; right: -2px; border-width: 0 4px 4px 0; }
         .scan-line {
             position: absolute; left: 0; right: 0; height: 2px;
-            background: var(--accent); box-shadow: 0 0 10px var(--accent);
+            background: var(--teal); box-shadow: 0 0 10px var(--teal);
             animation: scanLine 2s linear infinite;
         }
         .scanner-actions {
             display: flex; gap: 10px; margin-top: 16px;
         }
         .scanner-actions button { flex: 1; }
+        .scanner-status {
+            position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.7); color: var(--teal-light);
+            padding: 8px 16px; border-radius: 50px; font-size: 13px; font-weight: 500;
+            white-space: nowrap; z-index: 10;
+        }
+        .scanner-status.error { color: var(--red); }
+        .scanner-status.success { color: var(--green); }
 
         /* Empty State */
         .empty-state {
@@ -490,7 +529,7 @@
             box-shadow: var(--shadow);
         }
         .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-        .toast.success { border-color: var(--green); }
+        .toast.success { border-color: var(--teal); }
         .toast.error { border-color: var(--red); }
 
         /* Product Detail Modal */
@@ -527,6 +566,19 @@
         .stats-detail-card .value { font-size: 24px; font-weight: 800; }
         .stats-detail-card .label { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 
+        /* Manual EAN Input */
+        .manual-ean-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 20px;
+            margin-top: 16px;
+        }
+        .manual-ean-section h4 {
+            font-size: 14px; color: var(--text-secondary);
+            margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+        }
+
         /* Responsive */
         @media (min-width: 768px) {
             .main-content { padding-top: 80px; }
@@ -541,7 +593,10 @@
 <body>
     <!-- Header -->
     <header class="app-header">
-        <h1><i class="fas fa-barcode"></i> ScanEan</h1>
+        <div class="logo-container">
+            <img src="logo.png" alt="ScanEan" onerror="this.style.display='none'">
+            <h1><i class="fas fa-barcode"></i> ScanEan</h1>
+        </div>
         <div class="header-actions">
             <button class="header-btn" onclick="showStatsModal()" title="Statistiche"><i class="fas fa-chart-pie"></i></button>
             <button class="header-btn" onclick="showProfile()" title="Profilo"><i class="fas fa-user"></i></button>
@@ -636,9 +691,9 @@
             </div>
 
             <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); padding:20px; margin-bottom:20px;">
-                <h3 style="font-size:16px; margin-bottom:12px;"><i class="fas fa-info-circle" style="color:var(--accent);"></i> Accesso alla fotocamera</h3>
+                <h3 style="font-size:16px; margin-bottom:12px;"><i class="fas fa-info-circle" style="color:var(--teal);"></i> Accesso alla fotocamera</h3>
                 <p style="font-size:13px; color:var(--text-secondary); line-height:1.6;">
-                    Per scansionare i codici a barre e le date di scadenza, ScanEan ha bisogno di accedere alla fotocamera del tuo dispositivo.
+                    Per scansionare i codici a barre e le date di scadenza, ScanEan ha bisogno di accedere alla fotocamera del tuo dispositivo. Se la fotocamera non funziona, usa l'inserimento manuale.
                 </p>
             </div>
 
@@ -699,7 +754,7 @@
     <div class="modal-overlay" id="add-product-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title"><i class="fas fa-plus-circle" style="color:var(--accent);"></i> Nuovo Prodotto</h2>
+                <h2 class="modal-title"><i class="fas fa-plus-circle" style="color:var(--teal);"></i> Nuovo Prodotto</h2>
                 <button class="modal-close" onclick="closeModal('add-product-modal')"><i class="fas fa-times"></i></button>
             </div>
 
@@ -772,19 +827,43 @@
     <div class="modal-overlay" id="scanner-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title"><i class="fas fa-barcode" style="color:var(--accent);"></i> Scanner</h2>
+                <h2 class="modal-title"><i class="fas fa-barcode" style="color:var(--teal);"></i> Scanner</h2>
                 <button class="modal-close" onclick="closeModal('scanner-modal')"><i class="fas fa-times"></i></button>
             </div>
             <div class="scanner-view">
-                <video id="scanner-video" autoplay playsinline></video>
+                <video id="scanner-video" autoplay playsinline muted></video>
                 <div class="scanner-frame"><div class="scan-line"></div></div>
+                <div class="scanner-status" id="scanner-status">
+                    <i class="fas fa-camera"></i> Avvio fotocamera...
+                </div>
             </div>
             <div class="scanner-actions">
-                <button class="btn-primary" onclick="simulateScan()">
-                    <i class="fas fa-magic"></i> Simula Scansione
+                <button class="btn-coral" onclick="openManualEAN()">
+                    <i class="fas fa-keyboard"></i> Inserisci EAN
                 </button>
                 <button class="btn-secondary" onclick="closeModal('scanner-modal')">Chiudi</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Manual EAN Modal -->
+    <div class="modal-overlay" id="manual-ean-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-keyboard" style="color:var(--coral);"></i> Inserisci codice EAN</h2>
+                <button class="modal-close" onclick="closeModal('manual-ean-modal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Codice EAN / Barcode <span class="required">*</span></label>
+                <input type="text" class="form-input" id="manual-ean-input" placeholder="Es. 8001234567890" maxlength="13" inputmode="numeric">
+                <p style="font-size:12px; color:var(--text-muted); margin-top:6px;">
+                    <i class="fas fa-info-circle"></i> Inserisci il codice a barre del prodotto (8-13 cifre)
+                </p>
+            </div>
+            <button class="btn-coral" onclick="processManualEAN()">
+                <i class="fas fa-search"></i> Cerca prodotto
+            </button>
+            <button class="btn-secondary" onclick="closeModal('manual-ean-modal')">Annulla</button>
         </div>
     </div>
 
@@ -803,12 +882,12 @@
     <div class="modal-overlay" id="stats-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title"><i class="fas fa-chart-pie" style="color:var(--accent);"></i> Statistiche</h2>
+                <h2 class="modal-title"><i class="fas fa-chart-pie" style="color:var(--teal);"></i> Statistiche</h2>
                 <button class="modal-close" onclick="closeModal('stats-modal')"><i class="fas fa-times"></i></button>
             </div>
             <div class="stats-detail-grid">
                 <div class="stats-detail-card">
-                    <div class="value" id="detail-in-dispensa" style="color:var(--blue);">0</div>
+                    <div class="value" id="detail-in-dispensa" style="color:var(--teal);">0</div>
                     <div class="label">In dispensa</div>
                 </div>
                 <div class="stats-detail-card">
