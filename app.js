@@ -1924,6 +1924,356 @@ function terminateExpiryOCR() {
   }
 }
 // ============================================================
+// RILEVAMENTO DATA SCADENZA - SCANSIONE CONTINUA (come EAN)
+// ============================================================
+var expiryOCRWorker = null;
+var detectedExpiryDate = null;
+var detectedExpiryConfidence = 0;
+var expiryPhotoData = null;
+var expiryCameraStream = null;
+var expiryScanInterval = null;
+var isExpiryScanning = false;
+var lastOCRTime = 0;
+
+/**
+ * Inizializza il worker Tesseract.js
+ */
+function initExpiryOCR() {
+  if (expiryOCRWorker) return Promise.resolve();
+  
+  return new Promise(function(resolve, reject) {
+    if (typeof Tesseract === 'undefined') {
+      reject(new Error('Tesseract.js non caricato'));
+      return;
+    }
+    
+    Tesseract.createWorker('eng')
+      .then(function(worker) {
+        expiryOCRWorker = worker;
+        console.log('Tesseract.js worker pronto');
+        resolve();
+      })
+      .catch(function(err) {
+        console.error('Errore inizializzazione Tesseract:', err);
+        reject(err);
+      });
+  });
+}
+
+/**
+ * Avvia la scansione continua della data come il barcode
+ */
+function scanExpiryDate() {
+  var btn = document.getElementById('btn-scan-expiry');
+  var statusDiv = document.getElementById('expiry-scan-status');
+  
+  btn.disabled = true;
+  statusDiv.style.display = 'block';
+  
+  showToast('&#128247; Avvio scansione data... Inquadra la data');
+  
+  // Avvia fotocamera dedicata per la data
+  var video = document.getElementById('expiry-camera-video');
+  
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showToast('&#10060; Fotocamera non supportata');
+    btn.disabled = false;
+    statusDiv.style.display = 'none';
+    return;
+  }
+  
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+    audio: false
+  })
+  .then(function(stream) {
+    expiryCameraStream = stream;
+    video.srcObject = stream;
+    video.style.display = 'block';
+    
+    // Mostra overlay camera
+    document.getElementById('expiry-camera-overlay').classList.add('active');
+    
+    btn.disabled = false;
+    statusDiv.style.display = 'none';
+    
+    // Avvia scansione continua
+    isExpiryScanning = true;
+    startContinuousExpiryScan();
+  })
+  .catch(function(err) {
+    console.error('Errore fotocamera data:', err);
+    showToast('&#10060; Errore fotocamera: ' + err.message);
+    btn.disabled = false;
+    statusDiv.style.display = 'none';
+  });
+}
+
+/**
+ * Avvia la scansione continua dei frame
+ */
+function startContinuousExpiryScan() {
+  if (!isExpiryScanning) return;
+  
+  // Inizializza OCR e poi avvia loop
+  initExpiryOCR()
+    .then(function() {
+      // Loop di scansione ogni 600ms (più veloce del barcode)
+      expiryScanInterval = setInterval(analyzeExpiryFrame, 600);
+      showToast('&#128247; Inquadra la data... Rilevamento automatico');
+    })
+    .catch(function(err) {
+      showToast('&#10060; OCR non disponibile');
+      closeExpiryCamera();
+    });
+}
+
+/**
+ * Analizza un singolo frame dalla camera
+ */
+function analyzeExpiryFrame() {
+  if (!isExpiryScanning || !expiryOCRWorker) return;
+  
+  var now = Date.now();
+  if (now - lastOCRTime < 500) return; // Debounce 500ms
+  lastOCRTime = now;
+  
+  var video = document.getElementById('expiry-camera-video');
+  if (!video || !video.videoWidth) return;
+  
+  var statusDiv = document.getElementById('expiry-camera-status');
+  if (statusDiv) statusDiv.textContent = 'Analizzo...';
+  
+  // Crea canvas e cattura frame
+  var canvas = document.createElement('canvas');
+  var ctx = canvas.getContext('2d');
+  
+  // Cattura frame intero
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  
+  // Salva foto per preview
+  expiryPhotoData = canvas.toDataURL('image/jpeg', 0.9);
+  
+  // Ritaglia zona centrale (dove c'è la data)
+  var cropCanvas = document.createElement('canvas');
+  var cropCtx = cropCanvas.getContext('2d');
+  
+  var cropX = canvas.width * 0.1;
+  var cropY = canvas.height * 0.35;
+  var cropW = canvas.width * 0.8;
+  var cropH = canvas.height * 0.3;
+  
+  cropCanvas.width = cropW;
+  cropCanvas.height = cropH;
+  cropCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+  
+  // Preprocessing: grayscale + contrasto
+  var imageData = cropCtx.getImageData(0, 0, cropW, cropH);
+  var data = imageData.data;
+  for (var i = 0; i < data.length; i += 4) {
+    var gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+    gray = ((gray - 128) * 1.5) + 128;
+    gray = Math.max(0, Math.min(255, gray));
+    data[i] = data[i+1] = data[i+2] = gray;
+  }
+  cropCtx.putImageData(imageData, 0, 0);
+  
+  var ocrImageData = cropCanvas.toDataURL('image/jpeg', 0.9);
+  
+  // OCR con Tesseract
+  expiryOCRWorker.recognize(ocrImageData, {}, { 
+    tessedit_char_whitelist: '0123456789/.-',
+    psm: 6
+  })
+    .then(function(result) {
+      if (!isExpiryScanning) return;
+      
+      var text = result.data.text.trim();
+      var confidence = result.data.confidence || 0;
+      
+      console.log('OCR frame:', text, 'conf:', confidence);
+      
+      if (statusDiv) statusDiv.textContent = 'Confidenza: ' + Math.round(confidence) + '%';
+      
+      var date = extractDateFromText(text);
+      
+      if (date && confidence > 35) {
+        // Data trovata! Ferma scansione e mostra conferma
+        stopExpiryScan();
+        detectedExpiryDate = date;
+        detectedExpiryConfidence = confidence;
+        showExpiryConfirmModal(expiryPhotoData, date, confidence);
+      }
+    })
+    .catch(function(err) {
+      console.error('Errore OCR frame:', err);
+    });
+}
+
+/**
+ * Ferma la scansione continua
+ */
+function stopExpiryScan() {
+  isExpiryScanning = false;
+  if (expiryScanInterval) {
+    clearInterval(expiryScanInterval);
+    expiryScanInterval = null;
+  }
+}
+
+/**
+ * Chiude la fotocamera data
+ */
+function closeExpiryCamera() {
+  stopExpiryScan();
+  
+  var overlay = document.getElementById('expiry-camera-overlay');
+  var video = document.getElementById('expiry-camera-video');
+  
+  overlay.classList.remove('active');
+  
+  if (expiryCameraStream) {
+    expiryCameraStream.getTracks().forEach(function(track) { track.stop(); });
+    expiryCameraStream = null;
+  }
+  
+  video.srcObject = null;
+  video.style.display = 'none';
+  
+  document.getElementById('expiry-ocr-loading').classList.remove('active');
+}
+
+/**
+ * Estrae una data valida dal testo OCR
+ */
+function extractDateFromText(text) {
+  if (!text) return null;
+  
+  var clean = text.replace(/\s+/g, '');
+  
+  var patterns = [
+    { regex: /(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/, format: 'DMY' },
+    { regex: /(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})/, format: 'YMD' },
+    { regex: /(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2})/, format: 'DMY_SHORT' }
+  ];
+  
+  for (var i = 0; i < patterns.length; i++) {
+    var match = clean.match(patterns[i].regex);
+    if (match) {
+      var d, m, y;
+      
+      if (patterns[i].format === 'DMY' || patterns[i].format === 'DMY_SHORT') {
+        d = parseInt(match[1], 10);
+        m = parseInt(match[2], 10);
+        y = parseInt(match[3], 10);
+        if (patterns[i].format === 'DMY_SHORT') y += 2000;
+      } else if (patterns[i].format === 'YMD') {
+        y = parseInt(match[1], 10);
+        m = parseInt(match[2], 10);
+        d = parseInt(match[3], 10);
+      }
+      
+      if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 2020 && y <= 2040) {
+        var yy = String(y);
+        var mm = String(m).padStart(2, '0');
+        var dd = String(d).padStart(2, '0');
+        return yy + '-' + mm + '-' + dd;
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Mostra il modal di conferma data rilevata
+ */
+function showExpiryConfirmModal(previewUrl, dateStr, confidence) {
+  var previewDiv = document.getElementById('expiry-preview-img');
+  var valueDiv = document.getElementById('expiry-detected-value');
+  var confDiv = document.getElementById('expiry-detected-confidence');
+  
+  previewDiv.innerHTML = '<img src="' + previewUrl + '" alt="Frame data scadenza">';
+  
+  var parts = dateStr.split('-');
+  var displayDate = parts[2] + '/' + parts[1] + '/' + parts[0];
+  valueDiv.textContent = displayDate;
+  valueDiv.style.color = 'var(--primary)';
+  confDiv.textContent = 'Confidenza: ' + Math.round(confidence) + '%';
+  confDiv.style.display = 'block';
+  
+  document.getElementById('expiry-confirm-modal').classList.add('show');
+}
+
+/**
+ * Chiude il modal conferma data
+ */
+function closeExpiryConfirmModal(e) {
+  if (e.target === e.currentTarget) {
+    document.getElementById('expiry-confirm-modal').classList.remove('show');
+    detectedExpiryDate = null;
+    detectedExpiryConfidence = 0;
+    expiryPhotoData = null;
+  }
+}
+
+/**
+ * Accetta la data rilevata
+ */
+function acceptDetectedExpiry() {
+  if (detectedExpiryDate) {
+    document.getElementById('expiry-input').value = detectedExpiryDate;
+    showToast('&#9989; Data scadenza inserita: ' + formatDate(detectedExpiryDate));
+  }
+  document.getElementById('expiry-confirm-modal').classList.remove('show');
+  detectedExpiryDate = null;
+  detectedExpiryConfidence = 0;
+  expiryPhotoData = null;
+}
+
+/**
+ * Modifica manualmente
+ */
+function editDetectedExpiry() {
+  document.getElementById('expiry-confirm-modal').classList.remove('show');
+  
+  if (detectedExpiryDate) {
+    document.getElementById('expiry-input').value = detectedExpiryDate;
+  }
+  
+  setTimeout(function() {
+    document.getElementById('expiry-input').focus();
+    showToast('&#9998; Modifica la data e premi Aggiungi');
+  }, 300);
+  
+  detectedExpiryDate = null;
+  detectedExpiryConfidence = 0;
+  expiryPhotoData = null;
+}
+
+/**
+ * Ignora
+ */
+function rejectDetectedExpiry() {
+  document.getElementById('expiry-confirm-modal').classList.remove('show');
+  detectedExpiryDate = null;
+  detectedExpiryConfidence = 0;
+  expiryPhotoData = null;
+  showToast('&#10060; Data ignorata, inseriscila manualmente');
+}
+
+/**
+ * Termina il worker Tesseract
+ */
+function terminateExpiryOCR() {
+  if (expiryOCRWorker) {
+    expiryOCRWorker.terminate();
+    expiryOCRWorker = null;
+  }
+}
+// ============================================================
 // INIZIALIZZAZIONE
 // ============================================================
 if (document.readyState === 'loading') {
