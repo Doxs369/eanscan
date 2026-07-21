@@ -1304,158 +1304,18 @@ function captureBarcode() {
   }
 }
 // ============================================================
-// RILEVAMENTO DATA SCADENZA - SCANSIONE CONTINUA AVANZATA
-// Tesseract.js + Puter.js fallback + preprocessing avanzato
+// RILEVAMENTO DATA SCADENZA - OCR.space API + fallback
 // ============================================================
-var expiryOCRWorker = null;
 var detectedExpiryDate = null;
 var detectedExpiryConfidence = 0;
 var expiryPhotoData = null;
 var expiryCameraStream = null;
-var expiryScanInterval = null;
-var isExpiryScanning = false;
-var lastOCRTime = 0;
-var ocrAttemptCount = 0;
-var maxOCRAttempts = 30; // ~18 secondi di scansione
+
+// API key OCR.space - usa "helloworld" per test, poi registra su ocr.space per 25.000/mese
+var OCR_SPACE_API_KEY = 'helloworld';
 
 /**
- * Inizializza il worker Tesseract.js
- */
-function initExpiryOCR() {
-  if (expiryOCRWorker) return Promise.resolve();
-  
-  return new Promise(function(resolve, reject) {
-    if (typeof Tesseract === 'undefined') {
-      reject(new Error('Tesseract.js non caricato'));
-      return;
-    }
-    
-    Tesseract.createWorker('eng')
-      .then(function(worker) {
-        expiryOCRWorker = worker;
-        console.log('Tesseract.js worker pronto');
-        resolve();
-      })
-      .catch(function(err) {
-        console.error('Errore inizializzazione Tesseract:', err);
-        reject(err);
-      });
-  });
-}
-
-/**
- * Preprocessing avanzato dell'immagine per OCR
- * Applica: grayscale, contrast stretching, adaptive threshold, denoise
- */
-function preprocessForOCR(sourceCanvas) {
-  var w = sourceCanvas.width;
-  var h = sourceCanvas.height;
-  
-  // Canvas temporaneo per processing
-  var canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  var ctx = canvas.getContext('2d');
-  ctx.drawImage(sourceCanvas, 0, 0);
-  
-  var imgData = ctx.getImageData(0, 0, w, h);
-  var data = imgData.data;
-  var len = data.length;
-  
-  // Step 1: Grayscale
-  for (var i = 0; i < len; i += 4) {
-    var gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-    data[i] = data[i+1] = data[i+2] = gray;
-  }
-  
-  // Step 2: Contrast stretching (auto-level)
-  var minVal = 255, maxVal = 0;
-  for (var j = 0; j < len; j += 4) {
-    if (data[j] < minVal) minVal = data[j];
-    if (data[j] > maxVal) maxVal = data[j];
-  }
-  
-  var range = maxVal - minVal;
-  if (range < 1) range = 1;
-  
-  for (var k = 0; k < len; k += 4) {
-    var stretched = ((data[k] - minVal) / range) * 255;
-    data[k] = data[k+1] = data[k+2] = stretched;
-  }
-  
-  // Step 3: Sharpen (unsharp mask semplificato)
-  var tempData = new Uint8ClampedArray(data);
-  var sharpened = new Uint8ClampedArray(data);
-  
-  for (var y = 1; y < h - 1; y++) {
-    for (var x = 1; x < w - 1; x++) {
-      var idx = (y * w + x) * 4;
-      var center = tempData[idx];
-      var neighbors = (
-        tempData[((y-1) * w + (x-1)) * 4] +
-        tempData[((y-1) * w + x) * 4] +
-        tempData[((y-1) * w + (x+1)) * 4] +
-        tempData[(y * w + (x-1)) * 4] +
-        tempData[(y * w + (x+1)) * 4] +
-        tempData[((y+1) * w + (x-1)) * 4] +
-        tempData[((y+1) * w + x) * 4] +
-        tempData[((y+1) * w + (x+1)) * 4]
-      ) / 8;
-      
-      var sharpenedVal = center + (center - neighbors) * 1.5;
-      sharpenedVal = Math.max(0, Math.min(255, sharpenedVal));
-      sharpened[idx] = sharpened[idx+1] = sharpened[idx+2] = sharpenedVal;
-    }
-  }
-  
-  // Step 4: Adaptive threshold (soglia locale)
-  var blockSize = 15;
-  var c = 10;
-  var integral = new Int32Array(w * h);
-  
-  // Calcola immagine integrale
-  for (var y = 0; y < h; y++) {
-    var sum = 0;
-    for (var x = 0; x < w; x++) {
-      sum += sharpened[(y * w + x) * 4];
-      if (y === 0) {
-        integral[y * w + x] = sum;
-      } else {
-        integral[y * w + x] = integral[(y-1) * w + x] + sum;
-      }
-    }
-  }
-  
-  // Applica threshold adattivo
-  for (var y = 0; y < h; y++) {
-    var y1 = Math.max(0, y - Math.floor(blockSize/2));
-    var y2 = Math.min(h - 1, y + Math.floor(blockSize/2));
-    var rowCount = y2 - y1 + 1;
-    
-    for (var x = 0; x < w; x++) {
-      var x1 = Math.max(0, x - Math.floor(blockSize/2));
-      var x2 = Math.min(w - 1, x + Math.floor(blockSize/2));
-      var colCount = x2 - x1 + 1;
-      var count = rowCount * colCount;
-      
-      var sum = integral[y2 * w + x2];
-      if (y1 > 0) sum -= integral[(y1-1) * w + x2];
-      if (x1 > 0) sum -= integral[y2 * w + (x1-1)];
-      if (y1 > 0 && x1 > 0) sum += integral[(y1-1) * w + (x1-1)];
-      
-      var threshold = (sum / count) - c;
-      var idx = (y * w + x) * 4;
-      var val = sharpened[idx] < threshold ? 0 : 255;
-      data[idx] = data[idx+1] = data[idx+2] = val;
-    }
-  }
-  
-  ctx.putImageData(imgData, 0, 0);
-  return canvas;
-}
-
-/**
- * Avvia la scansione continua della data
+ * Avvia fotocamera per scattare foto alla data
  */
 function scanExpiryDate() {
   var btn = document.getElementById('btn-scan-expiry');
@@ -1464,7 +1324,7 @@ function scanExpiryDate() {
   btn.disabled = true;
   statusDiv.style.display = 'block';
   
-  showToast('&#128247; Avvio scansione data... Inquadra la data');
+  showToast('&#128247; Avvio fotocamera per data...');
   
   var video = document.getElementById('expiry-camera-video');
   
@@ -1483,72 +1343,28 @@ function scanExpiryDate() {
     expiryCameraStream = stream;
     video.srcObject = stream;
     video.style.display = 'block';
-    
     document.getElementById('expiry-camera-overlay').classList.add('active');
-    
     btn.disabled = false;
     statusDiv.style.display = 'none';
-    
-    isExpiryScanning = true;
-    ocrAttemptCount = 0;
-    startContinuousExpiryScan();
   })
   .catch(function(err) {
-    console.error('Errore fotocamera data:', err);
-    showToast('&#10060; Errore fotocamera: ' + err.message);
+    console.error('Errore fotocamera:', err);
+    showToast('&#10060; Errore: ' + err.message);
     btn.disabled = false;
     statusDiv.style.display = 'none';
   });
 }
 
 /**
- * Avvia loop scansione continua
+ * Cattura foto e analizza con OCR.space
  */
-function startContinuousExpiryScan() {
-  if (!isExpiryScanning) return;
-  
-  initExpiryOCR()
-    .then(function() {
-      expiryScanInterval = setInterval(analyzeExpiryFrame, 500);
-      showToast('&#128247; Inquadra la data... Rilevamento automatico');
-    })
-    .catch(function(err) {
-      // Fallback a Puter.js se Tesseract non funziona
-      if (typeof puter !== 'undefined') {
-        showToast('&#128247; Uso OCR avanzato...');
-        expiryScanInterval = setInterval(analyzeExpiryFramePuter, 800);
-      } else {
-        showToast('&#10060; OCR non disponibile');
-        closeExpiryCamera();
-      }
-    });
-}
-
-/**
- * Analizza frame con Tesseract.js + preprocessing avanzato
- */
-function analyzeExpiryFrame() {
-  if (!isExpiryScanning) return;
-  
-  var now = Date.now();
-  if (now - lastOCRTime < 400) return;
-  lastOCRTime = now;
-  
-  ocrAttemptCount++;
-  
-  // Timeout dopo troppi tentativi
-  if (ocrAttemptCount > maxOCRAttempts) {
-    stopExpiryScan();
-    showToast('&#128533; Data non rilevata, prova con piu luce o inserisci manualmente');
-    closeExpiryCamera();
-    return;
-  }
-  
+function captureExpiryPhoto() {
   var video = document.getElementById('expiry-camera-video');
   if (!video || !video.videoWidth) return;
   
-  var statusDiv = document.getElementById('expiry-camera-status');
-  if (statusDiv) statusDiv.textContent = 'Tentativo ' + ocrAttemptCount + '/' + maxOCRAttempts;
+  // Mostra loading
+  document.getElementById('expiry-ocr-loading').classList.add('active');
+  document.getElementById('expiry-camera-status').textContent = 'Analizzo...';
   
   // Cattura frame
   var canvas = document.createElement('canvas');
@@ -1560,144 +1376,133 @@ function analyzeExpiryFrame() {
   // Salva preview
   expiryPhotoData = canvas.toDataURL('image/jpeg', 0.9);
   
-  // Ritaglia zona data (area centrale)
+  // Chiudi camera
+  closeExpiryCamera();
+  
+  // Ritaglia zona data (area centrale dove c'è la cornice)
   var cropCanvas = document.createElement('canvas');
   var cropCtx = cropCanvas.getContext('2d');
-  var cropX = canvas.width * 0.05;
-  var cropY = canvas.height * 0.25;
-  var cropW = canvas.width * 0.9;
-  var cropH = canvas.height * 0.5;
+  var cropX = canvas.width * 0.1;
+  var cropY = canvas.height * 0.3;
+  var cropW = canvas.width * 0.8;
+  var cropH = canvas.height * 0.4;
   cropCanvas.width = cropW;
   cropCanvas.height = cropH;
   cropCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
   
-  // Preprocessing avanzato
-  var processedCanvas = preprocessForOCR(cropCanvas);
-  
-  // Ridimensiona per OCR (Tesseract funziona meglio a 300 DPI ~)
-  var finalCanvas = document.createElement('canvas');
-  var finalCtx = finalCanvas.getContext('2d');
-  var scale = 2;
-  finalCanvas.width = processedCanvas.width * scale;
-  finalCanvas.height = processedCanvas.height * scale;
-  finalCtx.imageSmoothingEnabled = false;
-  finalCtx.drawImage(processedCanvas, 0, 0, finalCanvas.width, finalCanvas.height);
-  
-  var ocrImageData = finalCanvas.toDataURL('image/jpeg', 0.95);
-  
-  // OCR con Tesseract
-  expiryOCRWorker.recognize(ocrImageData, {}, { 
-    tessedit_char_whitelist: '0123456789/.-',
-    psm: 6
-  })
-    .then(function(result) {
-      if (!isExpiryScanning) return;
-      
-      var text = result.data.text.trim();
-      var confidence = result.data.confidence || 0;
-      
-      console.log('OCR attempt', ocrAttemptCount, 'text:', text, 'conf:', confidence);
-      
-      if (statusDiv) statusDiv.textContent = 'Confidenza: ' + Math.round(confidence) + '%';
-      
-      var date = extractDateFromText(text);
-      
-      if (date && confidence > 30) {
-        stopExpiryScan();
-        closeExpiryCamera();
-        detectedExpiryDate = date;
-        detectedExpiryConfidence = confidence;
-        showExpiryConfirmModal(expiryPhotoData, date, confidence);
-      }
-    })
-    .catch(function(err) {
-      console.error('Errore OCR frame:', err);
-    });
+  // Converti a blob per upload
+  cropCanvas.toBlob(function(blob) {
+    // Chiama OCR.space API
+    callOCRSpace(blob);
+  }, 'image/jpeg', 0.95);
 }
 
 /**
- * Fallback: Analizza frame con Puter.js (OCR AI gratuito)
+ * Chiama OCR.space API
  */
-function analyzeExpiryFramePuter() {
-  if (!isExpiryScanning || typeof puter === 'undefined') return;
+function callOCRSpace(imageBlob) {
+  var formData = new FormData();
+  formData.append('file', imageBlob, 'expiry.jpg');
+  formData.append('apikey', OCR_SPACE_API_KEY);
+  formData.append('language', 'eng');
+  formData.append('isOverlayRequired', 'false');
+  formData.append('detectOrientation', 'true');
+  formData.append('scale', 'true');
+  formData.append('OCREngine', '2'); // Engine 2 = più accurato per numeri
   
-  var now = Date.now();
-  if (now - lastOCRTime < 700) return;
-  lastOCRTime = now;
-  
-  ocrAttemptCount++;
-  if (ocrAttemptCount > 20) {
-    stopExpiryScan();
-    showToast('&#128533; Data non rilevata con OCR AI');
-    closeExpiryCamera();
+  fetch('https://api.ocr.space/parse/image', {
+    method: 'POST',
+    body: formData
+  })
+  .then(function(response) {
+    return response.json();
+  })
+  .then(function(data) {
+    document.getElementById('expiry-ocr-loading').classList.remove('active');
+    
+    console.log('OCR.space response:', data);
+    
+    if (data.IsErroredOnProcessing) {
+      showToast('&#10060; Errore OCR: ' + (data.ErrorMessage || 'Sconosciuto'));
+      // Prova con Tesseract locale come fallback
+      fallbackTesseractOCR();
+      return;
+    }
+    
+    if (!data.ParsedResults || data.ParsedResults.length === 0) {
+      showToast('&#128533; Nessun testo rilevato, riprova');
+      return;
+    }
+    
+    var text = data.ParsedResults[0].ParsedText || '';
+    var confidence = data.ParsedResults[0].TextOverlay ? 
+      (data.ParsedResults[0].TextOverlay.HasOverlay ? 80 : 50) : 50;
+    
+    console.log('OCR text:', text);
+    
+    var date = extractDateFromText(text);
+    
+    if (date) {
+      detectedExpiryDate = date;
+      detectedExpiryConfidence = confidence;
+      showExpiryConfirmModal(expiryPhotoData, date, confidence);
+    } else {
+      showToast('&#128533; Data non trovata nel testo: \"' + text.substring(0, 50) + '\"');
+      // Mostra comunque il modal con possibilità di riprovare
+      showExpiryConfirmModal(expiryPhotoData, null, 0);
+    }
+  })
+  .catch(function(err) {
+    console.error('Errore OCR.space:', err);
+    document.getElementById('expiry-ocr-loading').classList.remove('active');
+    showToast('&#10060; Errore rete, provo OCR locale...');
+    fallbackTesseractOCR();
+  });
+}
+
+/**
+ * Fallback con Tesseract.js locale
+ */
+function fallbackTesseractOCR() {
+  if (typeof Tesseract === 'undefined') {
+    showToast('&#10060; OCR non disponibile, inserisci manualmente');
     return;
   }
   
-  var video = document.getElementById('expiry-camera-video');
-  if (!video || !video.videoWidth) return;
+  showToast('&#128247; Uso OCR locale...');
   
-  var statusDiv = document.getElementById('expiry-camera-status');
-  if (statusDiv) statusDiv.textContent = 'OCR AI... ' + ocrAttemptCount + '/20';
-  
-  var canvas = document.createElement('canvas');
-  var ctx = canvas.getContext('2d');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  
-  expiryPhotoData = canvas.toDataURL('image/jpeg', 0.9);
-  
-  // Ritaglio zona data
-  var cropCanvas = document.createElement('canvas');
-  var cropCtx = cropCanvas.getContext('2d');
-  var cropX = canvas.width * 0.05;
-  var cropY = canvas.height * 0.25;
-  var cropW = canvas.width * 0.9;
-  var cropH = canvas.height * 0.5;
-  cropCanvas.width = cropW;
-  cropCanvas.height = cropH;
-  cropCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-  
-  var imageData = cropCanvas.toDataURL('image/jpeg', 0.9);
-  
-  puter.ai.img2txt(imageData)
-    .then(function(text) {
-      if (!isExpiryScanning) return;
-      
-      console.log('Puter OCR text:', text);
-      
-      var date = extractDateFromText(text);
-      
-      if (date) {
-        stopExpiryScan();
-        closeExpiryCamera();
-        detectedExpiryDate = date;
-        detectedExpiryConfidence = 85; // Puter è generalmente accurato
-        showExpiryConfirmModal(expiryPhotoData, date, 85);
-      }
-    })
-    .catch(function(err) {
-      console.error('Puter OCR error:', err);
-    });
-}
-
-/**
- * Ferma la scansione
- */
-function stopExpiryScan() {
-  isExpiryScanning = false;
-  if (expiryScanInterval) {
-    clearInterval(expiryScanInterval);
-    expiryScanInterval = null;
-  }
+  Tesseract.recognize(
+    expiryPhotoData,
+    'eng',
+    { 
+      tessedit_char_whitelist: '0123456789/.-',
+      psm: 6
+    }
+  ).then(function(result) {
+    var text = result.data.text.trim();
+    var confidence = result.data.confidence || 0;
+    
+    console.log('Tesseract fallback:', text, confidence);
+    
+    var date = extractDateFromText(text);
+    
+    if (date && confidence > 30) {
+      detectedExpiryDate = date;
+      detectedExpiryConfidence = confidence;
+      showExpiryConfirmModal(expiryPhotoData, date, confidence);
+    } else {
+      showToast('&#128533; Data non rilevata, inserisci manualmente');
+    }
+  }).catch(function(err) {
+    console.error('Tesseract error:', err);
+    showToast('&#10060; OCR fallito, inserisci manualmente');
+  });
 }
 
 /**
  * Chiude la fotocamera data
  */
 function closeExpiryCamera() {
-  stopExpiryScan();
-  
   var overlay = document.getElementById('expiry-camera-overlay');
   var video = document.getElementById('expiry-camera-video');
   
@@ -1722,7 +1527,6 @@ function extractDateFromText(text) {
   
   var clean = text.replace(/\s+/g, ' ').trim();
   
-  // Pattern migliorati per date su imballaggi
   var patterns = [
     // DD/MM/YYYY o DD-MM-YYYY o DD.MM.YYYY
     { regex: /(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/, format: 'DMY' },
@@ -1730,7 +1534,7 @@ function extractDateFromText(text) {
     { regex: /(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})/, format: 'YMD' },
     // DD/MM/YY o DD-MM-YY
     { regex: /(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2})/, format: 'DMY_SHORT' },
-    // Formati con parole: 15 AGO 2026, 15 AGOSTO 2026
+    // Formati con parole: 15 AGO 2026
     { regex: /(\d{1,2})\s+(GEN|FEB|MAR|APR|MAG|GIU|LUG|AGO|SET|OTT|NOV|DIC)[A-Z]*\s+(\d{4})/i, format: 'DMY_WORD' },
     // EXP 15/08/2026, SCAD 15-08-2026
     { regex: /(?:EXP|SCAD|SCADENZA|BB|BEST BEFORE|USE BY)[^\d]*(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4}|\d{2})/i, format: 'DMY' },
@@ -1788,14 +1592,21 @@ function showExpiryConfirmModal(previewUrl, dateStr, confidence) {
   var valueDiv = document.getElementById('expiry-detected-value');
   var confDiv = document.getElementById('expiry-detected-confidence');
   
-  previewDiv.innerHTML = '<img src="' + previewUrl + '" alt="Frame data scadenza">';
+  previewDiv.innerHTML = '<img src="' + previewUrl + '" alt="Foto data scadenza">';
   
-  var parts = dateStr.split('-');
-  var displayDate = parts[2] + '/' + parts[1] + '/' + parts[0];
-  valueDiv.textContent = displayDate;
-  valueDiv.style.color = 'var(--primary)';
-  confDiv.textContent = 'Confidenza: ' + Math.round(confidence) + '%';
-  confDiv.style.display = 'block';
+  if (dateStr) {
+    var parts = dateStr.split('-');
+    var displayDate = parts[2] + '/' + parts[1] + '/' + parts[0];
+    valueDiv.textContent = displayDate;
+    valueDiv.style.color = 'var(--primary)';
+    confDiv.textContent = 'Confidenza: ' + Math.round(confidence) + '%';
+    confDiv.style.display = 'block';
+  } else {
+    valueDiv.textContent = 'Data non rilevata';
+    valueDiv.style.color = 'var(--danger)';
+    confDiv.textContent = 'Prova a scattare di nuovo con più luce';
+    confDiv.style.display = 'block';
+  }
   
   document.getElementById('expiry-confirm-modal').classList.add('show');
 }
@@ -1855,16 +1666,6 @@ function rejectDetectedExpiry() {
   detectedExpiryConfidence = 0;
   expiryPhotoData = null;
   showToast('&#10060; Data ignorata, inseriscila manualmente');
-}
-
-/**
- * Termina worker
- */
-function terminateExpiryOCR() {
-  if (expiryOCRWorker) {
-    expiryOCRWorker.terminate();
-    expiryOCRWorker = null;
-  }
 }
 // ============================================================
 // INIZIALIZZAZIONE
