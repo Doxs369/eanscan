@@ -34,7 +34,7 @@
 <link rel="apple-touch-startup-image" href="./icons/icon-512x512.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)">
 
 <title>ScanEan - Gestione Dispensa</title>
-<link rel="stylesheet" href="./style.css">
+<link rel="stylesheet" href="./style.css?v=2">
 <style>
 /* Stili aggiuntivi per ricette TheMealDB */
 .recipe-img-thumb {
@@ -423,6 +423,11 @@
   flex-shrink: 0;
 }
 </style>
+
+  <!-- Cache busting -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
 </head>
 <body>
 
@@ -826,8 +831,8 @@
 <script src="./openfoodfacts.js"></script>
 <script src="./recipes-api.js"></script>
 <script src="./camera.js"></script>
-<script src="./barcode-scanner.js"></script>
-<script src="./app.js"></script>
+<script src="./barcode-scanner.js?v=2"></script>
+<script src="./app.js?v=2"></script>
 
 
   <!-- PWA Install Banner -->
