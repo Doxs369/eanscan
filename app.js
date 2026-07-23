@@ -1630,11 +1630,9 @@ var isAutoScanning = false;
 
 function scanExpiryDate() {
   var btn = document.getElementById('btn-scan-expiry');
-  var statusDiv = document.getElementById('expiry-scan-status');
 
   btn.disabled = true;
   setExpiryButtonLoading(true);
-  statusDiv.style.display = 'block';
 
   showToast('&#128247; Avvio scansione automatica...');
 
