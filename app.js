@@ -71,7 +71,7 @@ function init() {
   setTimeout(function() {
     var splash = document.getElementById('splash');
     if (splash) splash.classList.add('hidden');
-  }, 1200);
+  }, 800);
 }
 
 function getMaxId(arr) {

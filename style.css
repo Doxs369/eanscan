@@ -1006,23 +1006,45 @@ body {
   transition: opacity 0.6s ease, visibility 0.6s;
 }
 .splash.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+/* Logo SVG container */
+.splash-logo-svg {
+  width: 140px;
+  height: 140px;
+  margin-bottom: 20px;
+  animation: splashPulse 1.5s ease-in-out infinite;
+  filter: drop-shadow(0 8px 24px rgba(0,0,0,0.25));
+}
+
+/* Cerchi di sfondo del logo */
+.splash-logo-svg .logo-bg-outer { fill: var(--primary); }
+.splash-logo-svg .logo-bg-mid { fill: #4BC4A5; opacity: 0.5; }
+.splash-logo-svg .logo-bg-inner { fill: #5DD4B5; opacity: 0.3; }
+
+/* Barre barcode */
+.splash-logo-svg .logo-bar { fill: white; }
+.splash-logo-svg .logo-bar-accent { fill: var(--accent); }
+
+/* Cornice scanner */
+.splash-logo-svg .logo-frame { fill: none; stroke: white; stroke-width: 2.5; stroke-dasharray: 6,4; opacity: 0.85; }
+
 .splash-logo {
-  font-size: 48px;
+  font-size: 42px;
   font-weight: 800;
   color: white;
   letter-spacing: -1px;
-  animation: splashPulse 1.5s ease-in-out infinite;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.15);
 }
 .splash-logo span { color: var(--accent-light); }
 .splash-sub {
-  margin-top: 12px;
-  color: rgba(255,255,255,0.7);
+  margin-top: 10px;
+  color: rgba(255,255,255,0.75);
   font-size: 14px;
   font-weight: 500;
 }
 @keyframes splashPulse {
   0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.05); opacity: 0.9; }
+  50% { transform: scale(1.04); opacity: 0.92; }
 }
 
 /* ===== ANIMATIONS ===== */
