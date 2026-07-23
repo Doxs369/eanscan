@@ -1438,14 +1438,14 @@ function formatDate(dateStr) {
 
 function showToast(msg) {
   var toast = document.getElementById('toast');
-  // Se il messaggio inizia con un'emoji HTML entity o carattere emoji Unicode, wrappala
   var processedMsg = msg;
-  // Pattern per catturare emoji all'inizio: &#XXXX; o &#X; o caratteri emoji Unicode
   var emojiMatch = msg.match(/^(\s*(&#\d+;|&#x[0-9a-fA-F]+;|[\uD83C-\uDBFF\uDC00-\uDFFF]|[\u2600-\u26FF]|[\u2700-\u27BF]|[\u{1F300}-\u{1F9FF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}])\s*)/u);
   if (emojiMatch) {
     var emoji = emojiMatch[1];
     var rest = msg.substring(emojiMatch[0].length);
-    processedMsg = '<span class="toast-emoji">' + emoji + '</span>' + rest;
+    processedMsg = '<span class="toast-emoji">' + emoji + '</span><span class="toast-text">' + rest.trim() + '</span>';
+  } else {
+    processedMsg = '<span class="toast-text">' + msg + '</span>';
   }
   toast.innerHTML = processedMsg;
   toast.classList.add('show');
