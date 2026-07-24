@@ -34,7 +34,7 @@
 <link rel="apple-touch-startup-image" href="./icons/icon-512x512.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)">
 
 <title>ScanEan - Gestione Dispensa</title>
-<link rel="stylesheet" href="./style.css?v=2">
+<link rel="stylesheet" href="./style.css?v=1.0">
 <style>
 /* Stili aggiuntivi per ricette TheMealDB */
 .recipe-img-thumb {
@@ -427,11 +427,6 @@
 #screen-list {
   padding-bottom: 40px;
 }</style>
-
-  <!-- Cache busting -->
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
 </head>
 <body>
 
@@ -852,12 +847,12 @@
 </div>
 
 <!-- MODULI JS -->
-<script src="./storage.js"></script>
-<script src="./openfoodfacts.js"></script>
-<script src="./recipes-api.js"></script>
-<script src="./camera.js"></script>
-<script src="./barcode-scanner.js?v=2"></script>
-<script src="./app.js?v=2"></script>
+<script src="./storage.js?v=1.0"></script>
+<script src="./openfoodfacts.js?v=1.0"></script>
+<script src="./recipes-api.js?v=1.0"></script>
+<script src="./camera.js?v=1.0"></script>
+<script src="./barcode-scanner.js?v=1.0"></script>
+<script src="./app.js?v=1.0"></script>
 
 
   <!-- PWA Install Banner -->
@@ -969,5 +964,27 @@
 
   })();
   </script>
+
+<!-- SW Update Handler -->
+<script>
+(function() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'SW_UPDATED') {
+        console.log('[PWA] Nuova versione rilevata: ' + event.data.version);
+        // Mostra toast opzionale all'utente
+        if (typeof showToast === 'function') {
+          showToast('&#128260; Aggiornamento disponibile! Ricarico...');
+        }
+        // Ricarica la pagina dopo 1.5 secondi per usare la nuova versione
+        setTimeout(function() {
+          window.location.reload();
+        }, 1500);
+      }
+    });
+  }
+})();
+</script>
+
 </body>
 </html>

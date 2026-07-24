@@ -1,9 +1,14 @@
 /**
- * ScanEan Service Worker v3
- * Caching offline con percorsi relativi per funzionare in qualsiasi cartella
+ * ScanEan Service Worker v4
+ * Cache versioning automatico + strategia Network First per asset dinamici
  */
 
-const CACHE_NAME = 'scanean-v3';
+// ==== CAMBIA QUESTO NUMERO AD OGNI DEPLOY ====
+// Esempi validi: '1.0', '1.1', '2.0', '3', 'v2.1'
+const APP_VERSION = '1.0';
+// =============================================
+
+const CACHE_NAME = 'scanean-v' + APP_VERSION;
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -26,13 +31,30 @@ const STATIC_ASSETS = [
   './icons/icon-512x512.png'
 ];
 
+// File che devono sempre essere aggiornati dal network (mai cache stale)
+const NETWORK_FIRST_PATTERNS = [
+  /\.html$/,
+  /\.js$/,
+  /\.css$/,
+  /manifest\.json$/
+];
+
+function isNetworkFirst(url) {
+  for (var i = 0; i < NETWORK_FIRST_PATTERNS.length; i++) {
+    if (NETWORK_FIRST_PATTERNS[i].test(url.pathname)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Installazione: cache degli asset statici
 self.addEventListener('install', function(event) {
-  console.log('[SW] Installazione in corso...');
+  console.log('[SW] Installazione v' + APP_VERSION + '...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(function(cache) {
-        console.log('[SW] Caching asset statici');
+        console.log('[SW] Caching asset statici v' + APP_VERSION);
         return cache.addAll(STATIC_ASSETS);
       })
       .then(function() {
@@ -44,9 +66,9 @@ self.addEventListener('install', function(event) {
   );
 });
 
-// Attivazione: pulizia cache vecchie + claim clients
+// Attivazione: pulizia cache vecchie + claim clients + notifica aggiornamento
 self.addEventListener('activate', function(event) {
-  console.log('[SW] Attivazione...');
+  console.log('[SW] Attivazione v' + APP_VERSION + '...');
   event.waitUntil(
     caches.keys()
       .then(function(cacheNames) {
@@ -62,10 +84,22 @@ self.addEventListener('activate', function(event) {
       .then(function() {
         return self.clients.claim();
       })
+      .then(function() {
+        // Notifica a TUTTI i client che c'e un aggiornamento
+        return self.clients.matchAll({ type: 'window' });
+      })
+      .then(function(clients) {
+        clients.forEach(function(client) {
+          client.postMessage({
+            type: 'SW_UPDATED',
+            version: APP_VERSION
+          });
+        });
+      })
   );
 });
 
-// Fetch: strategia Cache First per asset, Network First per API
+// Fetch: strategia intelligente
 self.addEventListener('fetch', function(event) {
   var request = event.request;
   var url = new URL(request.url);
@@ -88,8 +122,12 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // Per asset statici locali: Cache First
-  event.respondWith(cacheFirst(request));
+  // Per asset locali: Network First se e HTML/JS/CSS, altrimenti Cache First
+  if (isNetworkFirst(url)) {
+    event.respondWith(networkFirst(request));
+  } else {
+    event.respondWith(cacheFirst(request));
+  }
 });
 
 function isExternalAPI(url) {
@@ -123,11 +161,9 @@ function cacheFirst(request) {
           return networkResponse;
         })
         .catch(function() {
-          // Se e una navigazione HTML, mostra offline.html
           if (request.mode === 'navigate' || request.headers.get('accept').indexOf('text/html') !== -1) {
             return caches.match('./offline.html');
           }
-          // Altrimenti errore
           return new Response('Offline', {
             status: 503,
             statusText: 'Service Unavailable',
@@ -150,9 +186,29 @@ function networkFirst(request) {
       return networkResponse;
     })
     .catch(function() {
-      return caches.match(request);
+      return caches.match(request)
+        .then(function(cachedResponse) {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          if (request.mode === 'navigate' || request.headers.get('accept').indexOf('text/html') !== -1) {
+            return caches.match('./offline.html');
+          }
+          return new Response('Offline', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'text/plain' }
+          });
+        });
     });
 }
+
+// Gestione messaggi dal client (es. skip waiting)
+self.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 // Gestione push notification
 self.addEventListener('push', function(event) {
