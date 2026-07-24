@@ -345,7 +345,7 @@ body {
   border-radius: 20px;
   position: relative;
   z-index: 3;
-  margin-top: -26px;
+  margin-top: 26px;
   box-shadow: 0 0 0 4px rgba(59,176,149,0.15), 0 0 40px rgba(59,176,149,0.2);
 }
 .scanner-frame::before, .scanner-frame::after {
@@ -382,7 +382,7 @@ body {
 }
 .scanner-hint {
   position: absolute;
-  bottom: 104px;
+  bottom: 156px;
   z-index: 3;
   color: white;
   font-size: 14px;
@@ -394,7 +394,7 @@ body {
 }
 .scanner-actions {
   position: absolute;
-  bottom: 14px;
+  bottom: 66px;
   z-index: 3;
   display: flex;
   gap: 32px;
@@ -600,7 +600,7 @@ body {
   left: 0;
   right: 0;
   z-index: 5;
-  padding: 42px 16px 16px;
+  padding: 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1066,7 +1066,7 @@ body {
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 380px) {
-  .scanner-frame { width: 220px; height: 220px; margin-top: -26px; }
+  .scanner-frame { width: 220px; height: 220px; margin-top: 26px; }
   .stat-number { font-size: 22px; }
 }
 
